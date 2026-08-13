@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled (PgBouncer) connection for normal app queries.
+  url       = env("DATABASE_URL")
+  // Direct (non-pooler) connection, used only for migrations.
+  directUrl = env("DIRECT_URL")
+}
+
+// Roles and stage/status values are plain strings validated in the route
+// handlers (see src/routes), matching the convention used in the Sales
+// Pipeline Management app this is designed to eventually merge into.
+
+model Dealership {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  location  String?
+  state     String?
+  createdAt DateTime @default(now())
+
+  users     User[]
+  enquiries Enquiry[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         String // SC | CRE | SM | ASM
+  dealershipId Int
+  createdAt    DateTime @default(now())
+
+  dealership       Dealership @relation(fields: [dealershipId], references: [id])
+  enquiriesCreated Enquiry[]  @relation("EnquiryCreatedBy")
+  enquiriesCre     Enquiry[]  @relation("EnquiryCreUser")
+  enquiriesSm      Enquiry[]  @relation("EnquirySmUser")
+  enquiriesAsm     Enquiry[]  @relation("EnquiryAsmUser")
+}
+
+model Enquiry {
+  id         Int     @id @default(autoincrement())
+  clientUuid String? @unique
+
+  activityName           String
+  location               String
+  activityDate            DateTime
+  dealershipId            Int
+  customerName            String
+  contactNo               String
+  profile                 String
+  segment                 String
+  application             String?
+  currentVehicle          String?
+  vehicleModelInterested  String
+  variant                 String?
+  exchangeInterested      Boolean  @default(false)
+
+  stage String @default("CREATED") // CREATED | CRE_TAGGED | SM_TAGGED | ASM_TAGGED
+
+  creValidation String?
+  creTag        String?
+  creRemarks    String?
+  creUserId     Int?
+  creTaggedAt   DateTime?
+
+  smStatus    String?
+  smRemarks   String?
+  smUserId    Int?
+  smTaggedAt  DateTime?
+
+  asmStatus   String?
+  asmRemarks  String?
+  asmUserId   Int?
+  asmTaggedAt DateTime?
+
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dealership Dealership @relation(fields: [dealershipId], references: [id])
+  createdBy  User       @relation("EnquiryCreatedBy", fields: [createdById], references: [id])
+  creUser    User?      @relation("EnquiryCreUser", fields: [creUserId], references: [id])
+  smUser     User?      @relation("EnquirySmUser", fields: [smUserId], references: [id])
+  asmUser    User?      @relation("EnquiryAsmUser", fields: [asmUserId], references: [id])
+
+  @@index([stage])
+  @@index([dealershipId])
+}

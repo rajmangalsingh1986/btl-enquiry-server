@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: btl-enquiry-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: "npm install --include=dev && npx prisma generate"
+    startCommand: "npx prisma migrate deploy && npm run seed && npm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
