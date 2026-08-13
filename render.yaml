@@ -3,7 +3,6 @@ services:
     name: btl-enquiry-server
     runtime: node
     plan: free
-    rootDir: server
     buildCommand: "npm install --include=dev && npx prisma generate"
     startCommand: "npx prisma migrate deploy && npm run seed && npm start"
     envVars:
