@@ -7,7 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 const REQUIRED_FIELDS = [
-  "activityName", "location", "activityDate", "dealershipName",
+  "activityName", "location", "activityDate",
   "customerName", "contactNo", "profile", "segment",
   "vehicleModelInterested",
 ];
@@ -83,9 +83,12 @@ router.post("/", requireRole("SC"), asyncHandler(async (req, res) => {
     if (existing) return res.status(200).json(serialize(existing));
   }
 
-  const dealership = await prisma.dealership.findUnique({ where: { name: body.dealershipName } });
-  if (!dealership) {
-    return res.status(400).json({ error: "Selected dealership not found. Please refresh and pick another." });
+  // The enquiry's dealership is always the creating SC's own dealership, taken
+  // from their authenticated account - never from the request body. This is
+  // what guarantees an SC's enquiries can only ever reach the CRE/SM/ASM at
+  // their own dealership, regardless of what a client sends.
+  if (!req.user.dealershipId) {
+    return res.status(400).json({ error: "Your account is not assigned to a dealership. Contact your admin." });
   }
 
   const created = await prisma.enquiry.create({
@@ -94,7 +97,7 @@ router.post("/", requireRole("SC"), asyncHandler(async (req, res) => {
       activityName: body.activityName,
       location: body.location,
       activityDate: new Date(body.activityDate),
-      dealershipId: dealership.id,
+      dealershipId: req.user.dealershipId,
       customerName: body.customerName,
       contactNo: body.contactNo,
       profile: body.profile,
