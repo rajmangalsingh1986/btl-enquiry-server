@@ -5,6 +5,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/auth");
 const dealershipRoutes = require("./routes/dealerships");
 const enquiryRoutes = require("./routes/enquiries");
+const userRoutes = require("./routes/users");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 app.use("/auth", authRoutes);
 app.use("/dealerships", dealershipRoutes);
 app.use("/enquiries", enquiryRoutes);
+app.use("/users", userRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

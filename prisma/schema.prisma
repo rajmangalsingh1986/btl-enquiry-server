@@ -30,11 +30,11 @@ model User {
   name         String
   username     String   @unique
   passwordHash String
-  role         String // SC | CRE | SM | ASM
-  dealershipId Int
+  role         String // SC | CRE | SM | ASM | ADMIN
+  dealershipId Int? // null for ADMIN, who isn't scoped to one dealership
   createdAt    DateTime @default(now())
 
-  dealership       Dealership @relation(fields: [dealershipId], references: [id])
+  dealership       Dealership? @relation(fields: [dealershipId], references: [id])
   enquiriesCreated Enquiry[]  @relation("EnquiryCreatedBy")
   enquiriesCre     Enquiry[]  @relation("EnquiryCreUser")
   enquiriesSm      Enquiry[]  @relation("EnquirySmUser")

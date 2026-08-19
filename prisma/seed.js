@@ -6,12 +6,14 @@ const prisma = new PrismaClient();
 
 const DEALERSHIP_NAME = "Prime Motors - Andheri";
 
-const users = [
+const dealershipUsers = [
   { name: "Aarav Sharma", username: "sc1", password: "sc123", role: "SC" },
   { name: "Priya Nair", username: "cre1", password: "cre123", role: "CRE" },
   { name: "Rohan Mehta", username: "sm1", password: "sm123", role: "SM" },
   { name: "Kavita Rao", username: "asm1", password: "asm123", role: "ASM" },
 ];
+
+const admin = { name: "Admin", username: "admin1", password: "admin123", role: "ADMIN" };
 
 async function main() {
   const dealership = await prisma.dealership.upsert({
@@ -20,7 +22,7 @@ async function main() {
     create: { name: DEALERSHIP_NAME },
   });
 
-  for (const u of users) {
+  for (const u of dealershipUsers) {
     const passwordHash = await bcrypt.hash(u.password, 10);
     await prisma.user.upsert({
       where: { username: u.username },
@@ -40,8 +42,16 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${users.length} demo users for dealership "${DEALERSHIP_NAME}":`);
-  for (const u of users) console.log(`  ${u.role.padEnd(4)} -> username: ${u.username}  password: ${u.password}`);
+  const adminPasswordHash = await bcrypt.hash(admin.password, 10);
+  await prisma.user.upsert({
+    where: { username: admin.username },
+    update: { name: admin.name, passwordHash: adminPasswordHash, role: admin.role, dealershipId: null },
+    create: { name: admin.name, username: admin.username, passwordHash: adminPasswordHash, role: admin.role, dealershipId: null },
+  });
+
+  const allUsers = [...dealershipUsers, admin];
+  console.log(`Seeded ${allUsers.length} demo users:`);
+  for (const u of allUsers) console.log(`  ${u.role.padEnd(5)} -> username: ${u.username}  password: ${u.password}`);
 }
 
 main()
