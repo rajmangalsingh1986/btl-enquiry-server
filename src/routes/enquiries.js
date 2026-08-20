@@ -129,6 +129,8 @@ router.get("/", asyncHandler(async (req, res) => {
     where = { dealershipId, stage: "CRE_TAGGED" };
   } else if (role === "ASM") {
     where = { dealershipId, stage: "SM_TAGGED" };
+  } else if (role === "ADMIN") {
+    where = {};
   } else {
     return res.json([]);
   }
@@ -136,7 +138,7 @@ router.get("/", asyncHandler(async (req, res) => {
   const rows = await prisma.enquiry.findMany({
     where,
     include: enquiryInclude,
-    orderBy: { createdAt: role === "SC" || mine === "true" ? "desc" : "asc" },
+    orderBy: { createdAt: role === "SC" || role === "ADMIN" || mine === "true" ? "desc" : "asc" },
   });
   res.json(rows.map(serialize));
 }));
