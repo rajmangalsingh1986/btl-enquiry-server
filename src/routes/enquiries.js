@@ -117,7 +117,7 @@ router.post("/", requireRole("SC"), asyncHandler(async (req, res) => {
 
 // List enquiries - behavior depends on role
 router.get("/", asyncHandler(async (req, res) => {
-  const { role, id, dealershipId } = req.user;
+  const { role, id, dealershipId, dealershipIds } = req.user;
   const { mine } = req.query;
 
   let where;
@@ -126,9 +126,12 @@ router.get("/", asyncHandler(async (req, res) => {
   } else if (role === "CRE") {
     where = { dealershipId, stage: "CREATED" };
   } else if (role === "SM") {
-    where = { dealershipId, stage: "CRE_TAGGED" };
+    // SM now owns both the status tag and the final/closing tag.
+    where = { dealershipId, stage: { in: ["CRE_TAGGED", "SM_TAGGED"] } };
   } else if (role === "ASM") {
-    where = { dealershipId, stage: "SM_TAGGED" };
+    // View/download only, across every dealership in their assigned area -
+    // no stage filter, since they aren't acting on any of these.
+    where = { dealershipId: { in: dealershipIds || [] } };
   } else if (role === "ADMIN") {
     where = {};
   } else {
@@ -138,7 +141,7 @@ router.get("/", asyncHandler(async (req, res) => {
   const rows = await prisma.enquiry.findMany({
     where,
     include: enquiryInclude,
-    orderBy: { createdAt: role === "SC" || role === "ADMIN" || mine === "true" ? "desc" : "asc" },
+    orderBy: { createdAt: role === "SC" || role === "ADMIN" || role === "ASM" || mine === "true" ? "desc" : "asc" },
   });
   res.json(rows.map(serialize));
 }));
@@ -217,8 +220,9 @@ router.patch("/:id/sm", requireRole("SM"), asyncHandler(async (req, res) => {
   res.json(serialize(updated));
 }));
 
-// ASM final tagging
-router.patch("/:id/asm", requireRole("ASM"), asyncHandler(async (req, res) => {
+// Final/closing tag - performed by SM (ASM is view/download-only). Endpoint
+// path and field names keep the "asm" name for continuity.
+router.patch("/:id/asm", requireRole("SM"), asyncHandler(async (req, res) => {
   const { status, remarks } = req.body || {};
   if (!status) return res.status(400).json({ error: "status is required" });
 

@@ -6,13 +6,17 @@ const prisma = new PrismaClient();
 
 const DEALERSHIP_NAME = "Prime Motors - Andheri";
 
+// These are bootstrap accounts only - the seed creates them if missing, but
+// never touches an existing row. Once created, all further management
+// (dealership reassignment, role changes, deletion, etc.) happens through
+// the Admin UI and must survive redeploys untouched.
 const dealershipUsers = [
   { name: "Aarav Sharma", username: "sc1", password: "sc123", role: "SC" },
   { name: "Priya Nair", username: "cre1", password: "cre123", role: "CRE" },
   { name: "Rohan Mehta", username: "sm1", password: "sm123", role: "SM" },
-  { name: "Kavita Rao", username: "asm1", password: "asm123", role: "ASM" },
 ];
 
+const asm = { name: "Kavita Rao", username: "asm1", password: "asm123", role: "ASM" };
 const admin = { name: "Admin", username: "admin1", password: "admin123", role: "ADMIN" };
 
 async function main() {
@@ -26,12 +30,7 @@ async function main() {
     const passwordHash = await bcrypt.hash(u.password, 10);
     await prisma.user.upsert({
       where: { username: u.username },
-      update: {
-        name: u.name,
-        passwordHash,
-        role: u.role,
-        dealershipId: dealership.id,
-      },
+      update: {},
       create: {
         name: u.name,
         username: u.username,
@@ -42,15 +41,28 @@ async function main() {
     });
   }
 
+  const asmPasswordHash = await bcrypt.hash(asm.password, 10);
+  await prisma.user.upsert({
+    where: { username: asm.username },
+    update: {},
+    create: {
+      name: asm.name,
+      username: asm.username,
+      passwordHash: asmPasswordHash,
+      role: asm.role,
+      asmDealerships: { connect: [{ id: dealership.id }] },
+    },
+  });
+
   const adminPasswordHash = await bcrypt.hash(admin.password, 10);
   await prisma.user.upsert({
     where: { username: admin.username },
-    update: { name: admin.name, passwordHash: adminPasswordHash, role: admin.role, dealershipId: null },
-    create: { name: admin.name, username: admin.username, passwordHash: adminPasswordHash, role: admin.role, dealershipId: null },
+    update: {},
+    create: { name: admin.name, username: admin.username, passwordHash: adminPasswordHash, role: admin.role },
   });
 
-  const allUsers = [...dealershipUsers, admin];
-  console.log(`Seeded ${allUsers.length} demo users:`);
+  const allUsers = [...dealershipUsers, asm, admin];
+  console.log(`Seeded ${allUsers.length} demo users (only if not already present):`);
   for (const u of allUsers) console.log(`  ${u.role.padEnd(5)} -> username: ${u.username}  password: ${u.password}`);
 }
 

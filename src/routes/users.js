@@ -17,18 +17,38 @@ const userSelect = {
   username: true,
   role: true,
   dealership: { select: { id: true, name: true } },
+  asmDealerships: { select: { id: true, name: true } },
   createdAt: true,
 };
 
+// SC/CRE/SM: exactly one dealership. ADMIN: none. ASM: handled separately
+// below (a list, not a single value) via resolveAsmDealershipIds.
 async function resolveDealershipId(role, dealershipId) {
-  if (role !== "ADMIN" && !dealershipId) {
+  if (role === "ASM" || role === "ADMIN") return { dealershipIdNumber: null };
+  if (!dealershipId) {
     return { error: "dealershipId is required for this role" };
   }
-  if (!dealershipId) return { dealershipIdNumber: null };
 
   const dealership = await prisma.dealership.findUnique({ where: { id: Number(dealershipId) } });
   if (!dealership) return { error: "Selected dealership not found" };
   return { dealershipIdNumber: dealership.id };
+}
+
+// ASM covers an "area" - one or more dealerships - instead of the single
+// dealership everyone else is scoped to.
+async function resolveAsmDealershipIds(role, dealershipIds) {
+  if (role !== "ASM") return { asmDealershipIds: [] };
+
+  const ids = Array.isArray(dealershipIds) ? dealershipIds.map(Number) : [];
+  if (!ids.length) {
+    return { error: "At least one dealership is required for ASM" };
+  }
+
+  const found = await prisma.dealership.findMany({ where: { id: { in: ids } } });
+  if (found.length !== ids.length) {
+    return { error: "One or more selected dealerships were not found" };
+  }
+  return { asmDealershipIds: ids };
 }
 
 router.get("/", asyncHandler(async (req, res) => {
@@ -40,7 +60,7 @@ router.get("/", asyncHandler(async (req, res) => {
 }));
 
 router.post("/", asyncHandler(async (req, res) => {
-  const { name, username, password, role, dealershipId } = req.body || {};
+  const { name, username, password, role, dealershipId, dealershipIds } = req.body || {};
 
   if (!name || !username || !password || !role) {
     return res.status(400).json({ error: "name, username, password, and role are required" });
@@ -49,8 +69,11 @@ router.post("/", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(", ")}` });
   }
 
-  const { error, dealershipIdNumber } = await resolveDealershipId(role, dealershipId);
-  if (error) return res.status(400).json({ error });
+  const { error: dealershipError, dealershipIdNumber } = await resolveDealershipId(role, dealershipId);
+  if (dealershipError) return res.status(400).json({ error: dealershipError });
+
+  const { error: asmError, asmDealershipIds } = await resolveAsmDealershipIds(role, dealershipIds);
+  if (asmError) return res.status(400).json({ error: asmError });
 
   const passwordHash = await bcrypt.hash(password, 10);
   const created = await prisma.user.create({
@@ -60,6 +83,7 @@ router.post("/", asyncHandler(async (req, res) => {
       passwordHash,
       role,
       dealershipId: dealershipIdNumber,
+      asmDealerships: { connect: asmDealershipIds.map((id) => ({ id })) },
     },
     select: userSelect,
   });
@@ -69,26 +93,33 @@ router.post("/", asyncHandler(async (req, res) => {
 
 router.patch("/:id", asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
-  const existing = await prisma.user.findUnique({ where: { id } });
+  const existing = await prisma.user.findUnique({ where: { id }, include: { asmDealerships: true } });
   if (!existing) return res.status(404).json({ error: "User not found" });
 
-  const { name, username, password, role, dealershipId } = req.body || {};
+  const { name, username, password, role, dealershipId, dealershipIds } = req.body || {};
   const nextRole = role || existing.role;
   if (role && !VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(", ")}` });
   }
 
-  const { error, dealershipIdNumber } = await resolveDealershipId(
+  const { error: dealershipError, dealershipIdNumber } = await resolveDealershipId(
     nextRole,
     dealershipId !== undefined ? dealershipId : existing.dealershipId
   );
-  if (error) return res.status(400).json({ error });
+  if (dealershipError) return res.status(400).json({ error: dealershipError });
+
+  const { error: asmError, asmDealershipIds } = await resolveAsmDealershipIds(
+    nextRole,
+    dealershipIds !== undefined ? dealershipIds : existing.asmDealerships.map((d) => d.id)
+  );
+  if (asmError) return res.status(400).json({ error: asmError });
 
   const data = {
     name: name || existing.name,
     username: username || existing.username,
     role: nextRole,
     dealershipId: dealershipIdNumber,
+    asmDealerships: { set: asmDealershipIds.map((id) => ({ id })) },
   };
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);

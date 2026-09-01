@@ -14,7 +14,10 @@ router.post("/login", asyncHandler(async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: { dealership: { select: { id: true, name: true } } },
+    include: {
+      dealership: { select: { id: true, name: true } },
+      asmDealerships: { select: { id: true, name: true } },
+    },
   });
   if (!user) {
     return res.status(401).json({ error: "Invalid username or password" });
@@ -32,6 +35,9 @@ router.post("/login", asyncHandler(async (req, res) => {
     role: user.role,
     dealershipId: user.dealershipId,
     dealershipName: user.dealership?.name || null,
+    // ASM only: the set of dealerships their "area" covers.
+    dealershipIds: user.asmDealerships.map((d) => d.id),
+    dealershipNames: user.asmDealerships.map((d) => d.name),
   };
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "30d" });
