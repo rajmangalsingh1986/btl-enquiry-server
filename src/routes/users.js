@@ -18,8 +18,21 @@ const userSelect = {
   role: true,
   dealership: { select: { id: true, name: true } },
   asmDealerships: { select: { id: true, name: true } },
+  segment: true,
   createdAt: true,
 };
+
+const VALID_SEGMENTS = ["Personal", "Commercial"];
+
+// Meaningful only for CRE/SM. null = not specialized, sees every segment.
+function resolveSegment(role, segment) {
+  if (role !== "CRE" && role !== "SM") return { segmentValue: null };
+  if (!segment) return { segmentValue: null };
+  if (!VALID_SEGMENTS.includes(segment)) {
+    return { error: `segment must be one of: ${VALID_SEGMENTS.join(", ")}, or left blank` };
+  }
+  return { segmentValue: segment };
+}
 
 // SC/CRE/SM: exactly one dealership. ADMIN: none. ASM: handled separately
 // below (a list, not a single value) via resolveAsmDealershipIds.
@@ -60,7 +73,7 @@ router.get("/", asyncHandler(async (req, res) => {
 }));
 
 router.post("/", asyncHandler(async (req, res) => {
-  const { name, username, password, role, dealershipId, dealershipIds } = req.body || {};
+  const { name, username, password, role, dealershipId, dealershipIds, segment } = req.body || {};
 
   if (!name || !username || !password || !role) {
     return res.status(400).json({ error: "name, username, password, and role are required" });
@@ -75,6 +88,9 @@ router.post("/", asyncHandler(async (req, res) => {
   const { error: asmError, asmDealershipIds } = await resolveAsmDealershipIds(role, dealershipIds);
   if (asmError) return res.status(400).json({ error: asmError });
 
+  const { error: segmentError, segmentValue } = resolveSegment(role, segment);
+  if (segmentError) return res.status(400).json({ error: segmentError });
+
   const passwordHash = await bcrypt.hash(password, 10);
   const created = await prisma.user.create({
     data: {
@@ -84,6 +100,7 @@ router.post("/", asyncHandler(async (req, res) => {
       role,
       dealershipId: dealershipIdNumber,
       asmDealerships: { connect: asmDealershipIds.map((id) => ({ id })) },
+      segment: segmentValue,
     },
     select: userSelect,
   });
@@ -96,7 +113,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { id }, include: { asmDealerships: true } });
   if (!existing) return res.status(404).json({ error: "User not found" });
 
-  const { name, username, password, role, dealershipId, dealershipIds } = req.body || {};
+  const { name, username, password, role, dealershipId, dealershipIds, segment } = req.body || {};
   const nextRole = role || existing.role;
   if (role && !VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(", ")}` });
@@ -114,12 +131,19 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   );
   if (asmError) return res.status(400).json({ error: asmError });
 
+  const { error: segmentError, segmentValue } = resolveSegment(
+    nextRole,
+    segment !== undefined ? segment : existing.segment
+  );
+  if (segmentError) return res.status(400).json({ error: segmentError });
+
   const data = {
     name: name || existing.name,
     username: username || existing.username,
     role: nextRole,
     dealershipId: dealershipIdNumber,
     asmDealerships: { set: asmDealershipIds.map((id) => ({ id })) },
+    segment: segmentValue,
   };
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);

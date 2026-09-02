@@ -38,6 +38,8 @@ router.post("/login", asyncHandler(async (req, res) => {
     // ASM only: the set of dealerships their "area" covers.
     dealershipIds: user.asmDealerships.map((d) => d.id),
     dealershipNames: user.asmDealerships.map((d) => d.name),
+    // CRE/SM only: which segment they're specialized in, if any.
+    segment: user.segment,
   };
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "30d" });

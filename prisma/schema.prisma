@@ -33,6 +33,10 @@ model User {
   passwordHash String
   role         String // SC | CRE | SM | ASM | ADMIN
   dealershipId Int? // single dealership for SC/CRE/SM; null for ADMIN and ASM
+  // Meaningful only for CRE/SM: "Personal" | "Commercial" | null. Null means
+  // not specialized - sees enquiries of every segment at their dealership.
+  // BEV-segment enquiries always route with "Personal".
+  segment      String?
   createdAt    DateTime @default(now())
 
   dealership       Dealership?  @relation(fields: [dealershipId], references: [id])

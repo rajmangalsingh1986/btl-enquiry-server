@@ -19,6 +19,30 @@ const enquiryInclude = {
   asmUser: { select: { id: true, name: true } },
 };
 
+// Segment-based routing for CRE/SM. A null userSegment means "not
+// specialized" - sees every segment. BEV always travels with Personal.
+function segmentWhereClause(userSegment) {
+  if (!userSegment) return {};
+  if (userSegment === "Personal") return { segment: { in: ["Personal", "BEV"] } };
+  return { segment: userSegment };
+}
+
+function matchesUserSegment(enquirySegment, userSegment) {
+  if (!userSegment) return true;
+  if (userSegment === "Personal") return enquirySegment === "Personal" || enquirySegment === "BEV";
+  return enquirySegment === userSegment;
+}
+
+// Guards the CRE/SM tagging endpoints: even with the right role and stage,
+// an enquiry outside this user's own dealership/segment isn't theirs to act
+// on - closes the same gap the list endpoint's filtering already prevents
+// from being visible in the first place.
+function assertRoutedToUser(req, row) {
+  if (row.dealershipId !== req.user.dealershipId) return "This enquiry is not at your dealership.";
+  if (!matchesUserSegment(row.segment, req.user.segment)) return "This enquiry is not in your assigned segment.";
+  return null;
+}
+
 function serialize(row) {
   if (!row) return null;
   return {
@@ -117,17 +141,17 @@ router.post("/", requireRole("SC"), asyncHandler(async (req, res) => {
 
 // List enquiries - behavior depends on role
 router.get("/", asyncHandler(async (req, res) => {
-  const { role, id, dealershipId, dealershipIds } = req.user;
+  const { role, id, dealershipId, dealershipIds, segment } = req.user;
   const { mine } = req.query;
 
   let where;
   if (role === "SC" || mine === "true") {
     where = { createdById: id };
   } else if (role === "CRE") {
-    where = { dealershipId, stage: "CREATED" };
+    where = { dealershipId, stage: "CREATED", ...segmentWhereClause(segment) };
   } else if (role === "SM") {
     // SM now owns both the status tag and the final/closing tag.
-    where = { dealershipId, stage: { in: ["CRE_TAGGED", "SM_TAGGED"] } };
+    where = { dealershipId, stage: { in: ["CRE_TAGGED", "SM_TAGGED"] }, ...segmentWhereClause(segment) };
   } else if (role === "ASM") {
     // View/download only, across every dealership in their assigned area -
     // no stage filter, since they aren't acting on any of these.
@@ -177,6 +201,8 @@ router.patch("/:id/cre", requireRole("CRE"), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const row = await prisma.enquiry.findUnique({ where: { id } });
   if (!row) return res.status(404).json({ error: "Enquiry not found" });
+  const routingError = assertRoutedToUser(req, row);
+  if (routingError) return res.status(403).json({ error: routingError });
   if (row.stage !== "CREATED") return res.status(409).json({ error: `Enquiry is already at stage ${row.stage}` });
 
   const updated = await prisma.enquiry.update({
@@ -203,6 +229,8 @@ router.patch("/:id/sm", requireRole("SM"), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const row = await prisma.enquiry.findUnique({ where: { id } });
   if (!row) return res.status(404).json({ error: "Enquiry not found" });
+  const routingError = assertRoutedToUser(req, row);
+  if (routingError) return res.status(403).json({ error: routingError });
   if (row.stage !== "CRE_TAGGED") return res.status(409).json({ error: `Enquiry is already at stage ${row.stage}` });
 
   const updated = await prisma.enquiry.update({
@@ -229,6 +257,8 @@ router.patch("/:id/asm", requireRole("SM"), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const row = await prisma.enquiry.findUnique({ where: { id } });
   if (!row) return res.status(404).json({ error: "Enquiry not found" });
+  const routingError = assertRoutedToUser(req, row);
+  if (routingError) return res.status(403).json({ error: routingError });
   if (row.stage !== "SM_TAGGED") return res.status(409).json({ error: `Enquiry is already at stage ${row.stage}` });
 
   const updated = await prisma.enquiry.update({
