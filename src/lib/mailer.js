@@ -16,6 +16,11 @@ function getTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_APP_PASSWORD,
     },
+    // Some hosts silently block/throttle outbound SMTP - fail fast with a
+    // clear timeout error instead of hanging the request indefinitely.
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
   return transporter;
 }
