@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth");
 const dealershipRoutes = require("./routes/dealerships");
 const enquiryRoutes = require("./routes/enquiries");
 const userRoutes = require("./routes/users");
+const reportRoutes = require("./routes/reports");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/auth", authRoutes);
 app.use("/dealerships", dealershipRoutes);
 app.use("/enquiries", enquiryRoutes);
 app.use("/users", userRoutes);
+app.use("/reports", reportRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -14,3 +14,11 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false
+      - key: REPORT_RECIPIENTS
+        sync: false
+      - key: REPORT_CRON_SECRET
+        generateValue: true
