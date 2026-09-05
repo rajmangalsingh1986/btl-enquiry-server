@@ -35,7 +35,12 @@ function buildDayGroupMatrix(enquiries, groupFn) {
 
 const TD = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#374151;"';
 const TD_BOLD = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#111827;font-weight:700;"';
-const TH = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#111827;font-weight:700;background:#F9FAFB;text-align:left;"';
+const TH = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#1D4ED8;font-weight:700;background:#EFF6FF;text-align:left;"';
+const TH_PV = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#1D4ED8;font-weight:700;background:#EFF6FF;text-align:left;"';
+const TH_CV = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#C2410C;font-weight:700;background:#FFF7ED;text-align:left;"';
+const TD_TOTAL = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#B45309;font-weight:700;background:#FFFBEB;"';
+const TD_PV = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#1D4ED8;background:#EFF6FF;"';
+const TD_CV = 'style="padding:6px 10px;border:1px solid #E5E7EB;font-size:13px;color:#C2410C;background:#FFF7ED;"';
 
 function renderDayGroupTable(enquiries, groupFn, title) {
   if (!enquiries.length) return "";
@@ -54,9 +59,9 @@ function renderDayGroupTable(enquiries, groupFn, title) {
     })
     .join("");
   const totalCells = [
-    `<td ${TD_BOLD}>Total</td>`,
-    ...groups.map((g) => `<td ${TD_BOLD}>${groupTotals[g]}</td>`),
-    `<td ${TD_BOLD}>${enquiries.length}</td>`,
+    `<td ${TD_TOTAL}>Total</td>`,
+    ...groups.map((g) => `<td ${TD_TOTAL}>${groupTotals[g]}</td>`),
+    `<td ${TD_TOTAL}>${enquiries.length}</td>`,
   ].join("");
 
   return `
@@ -88,7 +93,7 @@ function renderDealershipVehicleTypeTable(enquiries, title) {
         if (vehicleType(e.segment) === "CV") cv += 1;
         else pv += 1;
       }
-      return `<tr><td ${TD}>${dealershipName}</td><td ${TD}>${pv}</td><td ${TD}>${cv}</td><td ${TD_BOLD}>${pv + cv}</td></tr>`;
+      return `<tr><td ${TD}>${dealershipName}</td><td ${TD_PV}>${pv}</td><td ${TD_CV}>${cv}</td><td ${TD_BOLD}>${pv + cv}</td></tr>`;
     })
     .join("");
 
@@ -104,10 +109,10 @@ function renderDealershipVehicleTypeTable(enquiries, title) {
   return `
     <h3 style="font-size:15px;color:#111827;margin:24px 0 8px;">${title}</h3>
     <table style="border-collapse:collapse;">
-      <thead><tr><th ${TH}>Dealership</th><th ${TH}>PV</th><th ${TH}>CV</th><th ${TH}>Total</th></tr></thead>
+      <thead><tr><th ${TH}>Dealership</th><th ${TH_PV}>PV</th><th ${TH_CV}>CV</th><th ${TH}>Total</th></tr></thead>
       <tbody>
         ${bodyRows}
-        <tr><td ${TD_BOLD}>Total</td><td ${TD_BOLD}>${totals.pv}</td><td ${TD_BOLD}>${totals.cv}</td><td ${TD_BOLD}>${enquiries.length}</td></tr>
+        <tr><td ${TD_TOTAL}>Total</td><td ${TD_TOTAL}>${totals.pv}</td><td ${TD_TOTAL}>${totals.cv}</td><td ${TD_TOTAL}>${enquiries.length}</td></tr>
       </tbody>
     </table>
   `;
