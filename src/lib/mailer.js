@@ -1,38 +1,22 @@
-const nodemailer = require("nodemailer");
-
-// SMTP_HOST/PORT default to Gmail's fixed endpoint since that's what every
-// Gmail/Workspace account uses - only SMTP_USER/SMTP_APP_PASSWORD need to
-// vary per deployment. SMTP_USER must have an app password (2-Step
-// Verification), not its normal account password - Gmail rejects plain
-// password SMTP logins.
-let transporter = null;
-function getTransporter() {
-  if (transporter) return transporter;
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_APP_PASSWORD,
-    },
-    // Some hosts silently block/throttle outbound SMTP - fail fast with a
-    // clear timeout error instead of hanging the request indefinitely.
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-  return transporter;
-}
-
+// Resend's HTTP API instead of SMTP - Render blocks outbound SMTP ports
+// (confirmed via ETIMEDOUT testing raw Gmail SMTP from this same server),
+// so sending has to go over plain HTTPS instead. RESEND_FROM must be an
+// address on a domain verified in Resend's dashboard to send to anyone
+// other than the Resend account's own signup email.
 async function sendMail({ to, subject, html }) {
-  const transport = getTransporter();
-  await transport.sendMail({
-    from: process.env.SMTP_USER,
-    to,
-    subject,
-    html,
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from: process.env.RESEND_FROM, to, subject, html }),
   });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend API error (${res.status}): ${body}`);
+  }
 }
 
 module.exports = { sendMail };

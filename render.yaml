@@ -14,9 +14,9 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: SMTP_USER
+      - key: RESEND_API_KEY
         sync: false
-      - key: SMTP_APP_PASSWORD
+      - key: RESEND_FROM
         sync: false
       - key: REPORT_RECIPIENTS
         sync: false

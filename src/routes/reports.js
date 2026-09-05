@@ -33,11 +33,11 @@ router.post("/daily-dashboard", requireCronSecret, asyncHandler(async (req, res)
       html,
     });
   } catch (err) {
-    // Surfaced directly (rather than falling through to the generic error
-    // middleware) since SMTP failures need their real code/message to
-    // diagnose - e.g. distinguishing a network block (ETIMEDOUT) from bad
-    // credentials (EAUTH), neither of which is sensitive to expose here.
-    return res.status(502).json({ error: "Failed to send email", code: err.code, message: err.message });
+    // Surfaced directly rather than falling through to the generic error
+    // middleware - Resend's error body (e.g. "domain not verified", "from
+    // address not allowed") is genuinely useful for diagnosing setup issues
+    // and isn't sensitive.
+    return res.status(502).json({ error: "Failed to send email", message: err.message });
   }
 
   res.json({ ok: true, sentTo: recipients.length });
