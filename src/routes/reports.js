@@ -26,11 +26,19 @@ router.post("/daily-dashboard", requireCronSecret, asyncHandler(async (req, res)
   }
 
   const html = await buildDailyDashboardHtml();
-  await sendMail({
-    to: recipients,
-    subject: `Sarpanch Ka Samman - Daily Enquiry Report - ${new Date().toISOString().slice(0, 10)}`,
-    html,
-  });
+  try {
+    await sendMail({
+      to: recipients,
+      subject: `Sarpanch Ka Samman - Daily Enquiry Report - ${new Date().toISOString().slice(0, 10)}`,
+      html,
+    });
+  } catch (err) {
+    // Surfaced directly (rather than falling through to the generic error
+    // middleware) since SMTP failures need their real code/message to
+    // diagnose - e.g. distinguishing a network block (ETIMEDOUT) from bad
+    // credentials (EAUTH), neither of which is sensitive to expose here.
+    return res.status(502).json({ error: "Failed to send email", code: err.code, message: err.message });
+  }
 
   res.json({ ok: true, sentTo: recipients.length });
 }));
