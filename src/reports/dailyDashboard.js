@@ -68,6 +68,51 @@ function renderDayGroupTable(enquiries, groupFn, title) {
   `;
 }
 
+// PV = Personal Vehicle, CV = Commercial Vehicle - matches the PV/CV role
+// naming already used for CRE/SM accounts. BEV counts as PV, same as the
+// CRE/SM segment-routing rule elsewhere in the app.
+function vehicleType(segment) {
+  return segment === "Commercial" ? "CV" : "PV";
+}
+
+function renderDealershipVehicleTypeTable(enquiries, title) {
+  if (!enquiries.length) return "";
+  const dealerships = [...new Set(enquiries.map((e) => e.dealershipName))].sort();
+
+  const bodyRows = dealerships
+    .map((dealershipName) => {
+      let pv = 0;
+      let cv = 0;
+      for (const e of enquiries) {
+        if (e.dealershipName !== dealershipName) continue;
+        if (vehicleType(e.segment) === "CV") cv += 1;
+        else pv += 1;
+      }
+      return `<tr><td ${TD}>${dealershipName}</td><td ${TD}>${pv}</td><td ${TD}>${cv}</td><td ${TD_BOLD}>${pv + cv}</td></tr>`;
+    })
+    .join("");
+
+  const totals = enquiries.reduce(
+    (acc, e) => {
+      if (vehicleType(e.segment) === "CV") acc.cv += 1;
+      else acc.pv += 1;
+      return acc;
+    },
+    { pv: 0, cv: 0 }
+  );
+
+  return `
+    <h3 style="font-size:15px;color:#111827;margin:24px 0 8px;">${title}</h3>
+    <table style="border-collapse:collapse;">
+      <thead><tr><th ${TH}>Dealership</th><th ${TH}>PV</th><th ${TH}>CV</th><th ${TH}>Total</th></tr></thead>
+      <tbody>
+        ${bodyRows}
+        <tr><td ${TD_BOLD}>Total</td><td ${TD_BOLD}>${totals.pv}</td><td ${TD_BOLD}>${totals.cv}</td><td ${TD_BOLD}>${enquiries.length}</td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
 function renderBreakdownList(entries, title) {
   const rows = Object.entries(entries)
     .sort((a, b) => b[1] - a[1])
@@ -92,7 +137,6 @@ async function buildDailyDashboardHtml() {
     asmStatus: row.asmStatus,
   }));
 
-  const byDealership = countBy(enquiries, (e) => e.dealershipName);
   const byFinalStatus = countBy(
     enquiries.filter((e) => e.stage === "ASM_TAGGED"),
     (e) => e.asmStatus
@@ -106,7 +150,7 @@ async function buildDailyDashboardHtml() {
       <p style="font-size:13px;color:#6B7280;margin-top:0;">${today} &middot; ${enquiries.length} total enquiries</p>
       ${renderDayGroupTable(enquiries, (e) => e.dealershipName, "Enquiry Flow by Day & Dealership")}
       ${renderDayGroupTable(enquiries, (e) => e.segment, "Enquiry Flow by Day & Segment")}
-      ${renderBreakdownList(byDealership, "Enquiries by Dealership")}
+      ${renderDealershipVehicleTypeTable(enquiries, "Enquiries by Dealership")}
       ${renderBreakdownList(byFinalStatus, "Closed Enquiries by Final Status")}
     </div>
   `;
